@@ -7,6 +7,8 @@ import logger from './utils/logger';
 import { seriesRoutes } from './api/series.routes';
 import { authRoutes } from './api/auth.routes';
 import { userRoutes } from './api/user.routes';
+import { championshipRoutes } from './api/championships.routes';
+import { pointsSchemeRoutes } from './api/pointsSchemes.routes';
 import { AppError } from './utils/errors';
 
 /**
@@ -55,7 +57,8 @@ fastify.register(async (instance) => {
   instance.register(authRoutes, { prefix: '/api' });
   instance.register(userRoutes, { prefix: '/api' });
   instance.register(seriesRoutes, { prefix: '/api' });
-  // Add more route modules here as they're implemented
+  instance.register(championshipRoutes, { prefix: '/api' });
+  instance.register(pointsSchemeRoutes, { prefix: '/api' });
 }, { prefix: '' });
 
 // Global error handler

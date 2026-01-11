@@ -30,7 +30,7 @@ declare module 'fastify' {
 declare module '@fastify/jwt' {
   interface FastifyJWT {
     payload: JWTPayload;
-    user: JWTPayload;
+    user: AuthenticatedUser;
   }
 }
 
