@@ -57,20 +57,20 @@ Administrators need to assign or change user roles to control what actions users
 
 ---
 
-### User Story 4 - Grant Series-Specific Editor Permissions (Priority: P2)
+### User Story 4 - Grant Content Series-Specific Editor Permissions (Priority: P2)
 
-Administrators need to elevate individual Members to have Editor permissions for specific series, allowing granular content management without giving them full Editor privileges across the entire system.
+Administrators need to elevate individual Members to have Editor permissions for specific content series (content collections), allowing granular content management without giving them full Editor privileges across the entire system.
 
-**Why this priority**: This enables flexible permission management where users can contribute to specific areas without full editorial access. This is critical for collaborative systems with multiple content series or projects.
+**Why this priority**: This enables flexible permission management where users can contribute to specific content areas without full editorial access. This is critical for collaborative systems with multiple content series or projects.
 
-**Independent Test**: Can be fully tested by creating a Member user, granting them Editor permissions for a specific series, then verifying they can edit content in that series but not in other series. Delivers value by enabling granular access control without promoting users to full Editor role.
+**Independent Test**: Can be fully tested by creating a Member user, granting them Editor permissions for a specific content series, then verifying they can edit content in that series but not in other series. Delivers value by enabling granular access control without promoting users to full Editor role.
 
 **Acceptance Scenarios**:
 
-1. **Given** a user with Member role exists and a series exists, **When** an admin grants the user Editor permissions for that specific series, **Then** the user can edit content within that series
-2. **Given** a user has series-specific Editor permissions, **When** they attempt to edit content in a different series, **Then** they are denied access and see their Member-level permissions apply
-3. **Given** a user has series-specific Editor permissions, **When** an admin views the user's permissions, **Then** they can see both the base role (Member) and all series-specific permissions listed
-4. **Given** a user has series-specific Editor permissions, **When** an admin revokes the series-specific permission, **Then** the user immediately loses Editor access to that series and returns to Member permissions
+1. **Given** a user with Member role exists and a content series exists, **When** an admin grants the user Editor permissions for that specific content series, **Then** the user can edit content within that series
+2. **Given** a user has content series-specific Editor permissions, **When** they attempt to edit content in a different series, **Then** they are denied access and see their Member-level permissions apply
+3. **Given** a user has content series-specific Editor permissions, **When** an admin views the user's permissions, **Then** they can see both the base role (Member) and all content series-specific permissions listed
+4. **Given** a user has content series-specific Editor permissions, **When** an admin revokes the content series-specific permission, **Then** the user immediately loses Editor access to that series and returns to Member permissions
 
 ---
 
@@ -117,11 +117,11 @@ Administrators need to view a history of administrative actions performed in the
 - How does the system behave if admin credentials are compromised?
 - What happens to users' active sessions when their role or status is changed?
 - How are failed admin login attempts handled and monitored?
-- What happens to series-specific permissions when a user's base role is changed from Member to Editor or Admin?
-- What happens when a series that has users with series-specific permissions is deleted?
-- Can an admin grant series-specific permissions to a user who already has Editor or Admin base role?
-- What happens to series-specific permissions when a user is deactivated or deleted?
-- How does the system handle granting duplicate series-specific permissions (same user, same series)?
+- What happens to content series-specific permissions when a user's base role is changed from Member to Editor or Admin?
+- What happens when a content series that has users with series-specific permissions is deleted?
+- Can an admin grant content series-specific permissions to a user who already has Editor or Admin base role?
+- What happens to content series-specific permissions when a user is deactivated or deleted?
+- How does the system handle granting duplicate content series-specific permissions (same user, same series)?
 
 ## Requirements *(mandatory)*
 
@@ -143,19 +143,19 @@ Administrators need to view a history of administrative actions performed in the
 - **FR-014**: System MUST display clear error messages when admin actions fail (e.g., permission denied, validation errors)
 - **FR-015**: System MUST validate all user data before creation or modification (email format, required fields, etc.)
 - **FR-016**: System MUST support three primary user roles: Admin (full system access), Editor (content editing capabilities), and Member (basic access)
-- **FR-017**: System MUST allow admins to grant series-specific Editor permissions to users with Member role
-- **FR-018**: System MUST enforce series-specific permissions so users can only edit content in series where they have explicit Editor permissions
-- **FR-019**: System MUST display all series-specific permissions when viewing a user's permissions
-- **FR-020**: System MUST allow admins to revoke series-specific Editor permissions, immediately restoring base role permissions
+- **FR-017**: System MUST allow admins to grant content series-specific Editor permissions to users with Member role
+- **FR-018**: System MUST enforce content series-specific permissions so users can only edit content in series where they have explicit Editor permissions
+- **FR-019**: System MUST display all content series-specific permissions when viewing a user's permissions
+- **FR-020**: System MUST allow admins to revoke content series-specific Editor permissions, immediately restoring base role permissions
 
 ### Key Entities
 
 - **Admin User**: A privileged user account with elevated permissions to manage other users and system settings. Key attributes include: unique identifier, credentials (username/email and password), admin role flag, creation date, last login time, active status
-- **User Account**: Represents any user in the system (including admins). Key attributes include: unique identifier, name, email, base role assignment (Admin/Editor/Member), account status (active/inactive/deleted), creation date, last modified date, created by (admin identifier). Relationships: A user has one base role and can have multiple series-specific permissions
+- **User Account**: Represents any user in the system (including admins). Key attributes include: unique identifier, name, email, base role assignment (Admin/Editor/Member), account status (active/inactive/deleted), creation date, last modified date, created by (admin identifier). Relationships: A user has one base role and can have multiple content series-specific permissions
 - **User Role**: Defines a set of permissions that can be assigned to users as their base role. Supported roles: Admin (full system access), Editor (content editing capabilities), Member (basic access). Key attributes include: role name, permission set, description
-- **Series**: Represents a content series or project within the system that can have specific permissions granted. Key attributes include: unique identifier, name, description. Relationships: Can have multiple series-specific permissions assigned to different users
-- **Series-Specific Permission**: Links a user to elevated permissions (Editor) for a specific series. Key attributes include: user identifier, series identifier, permission level (Editor), granted by (admin identifier), granted date. Relationships: Connects a Member user to a series, granting them Editor permissions for that series only
-- **Activity Log Entry**: Records an administrative action for audit purposes. Key attributes include: timestamp, admin user identifier, action type (create/update/delete/activate/deactivate/grant_permission/revoke_permission), target entity type (user, role, series_permission), target entity identifier, previous values (for updates), new values. Relationships: Each entry links to the admin who performed the action and the entity that was affected
+- **Content Series**: Represents a content series (content collection) within the system that can have specific permissions granted. Key attributes include: unique identifier, name, description. Relationships: Can have multiple content series-specific permissions assigned to different users
+- **Content Series-Specific Permission**: Links a user to elevated permissions (Editor) for a specific content series. Key attributes include: user identifier, content series identifier, permission level (Editor), granted by (admin identifier), granted date. Relationships: Connects a Member user to a content series, granting them Editor permissions for that series only
+- **Activity Log Entry**: Records an administrative action for audit purposes. Key attributes include: timestamp, admin user identifier, action type (create/update/delete/activate/deactivate/grant_permission/revoke_permission), target entity type (user, role, content_series_permission), target entity identifier, previous values (for updates), new values. Relationships: Each entry links to the admin who performed the action and the entity that was affected
 
 ## Success Criteria *(mandatory)*
 
@@ -188,8 +188,8 @@ This section documents assumptions and decisions made while creating this specif
 
 7. **Admin Bootstrap**: Assumed there is a mechanism to create the initial admin user (e.g., during system setup or via configuration). The specification focuses on ongoing admin user management rather than initial system setup.
 
-8. **Series Context**: The system manages content organized into series/projects, and individual users can be granted Editor permissions for specific series while maintaining their base Member role elsewhere.
+8. **Content Series Context**: The system manages content organized into content series (content collections), and individual users can be granted Editor permissions for specific content series while maintaining their base Member role elsewhere.
 
-9. **Permission Scope**: Series-specific Editor permissions only apply to Members. Users with Editor or Admin base roles already have editing capabilities and don't need series-specific permissions.
+9. **Permission Scope**: Content series-specific Editor permissions only apply to Members. Users with Editor or Admin base roles already have editing capabilities and don't need content series-specific permissions.
 
-10. **Permission Display**: When viewing a user's permissions, both the base role and all series-specific permissions are displayed together for complete visibility.
+10. **Permission Display**: When viewing a user's permissions, both the base role and all content series-specific permissions are displayed together for complete visibility.

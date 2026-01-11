@@ -1,0 +1,1184 @@
+openapi: 3.0.3
+info:
+  title: SNRL Manager - Content and Series Management API
+  description: |
+    REST API for content organization, versioning, and publication management.
+
+    This API provides endpoints for:
+    - Content series (collection) management
+    - Content item CRUD with lifecycle management (draft/published/archived)
+    - Version history and restoration
+    - Content search and filtering
+    - View tracking and analytics
+
+    **Feature**: 003-database
+    **Date**: 2026-01-10
+  version: 1.0.0
+  contact:
+    name: SNRL Manager API Support
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://staging.snrl.example/api
+    description: Staging environment
+  - url: https://snrl.example/api
+    description: Production environment
+
+tags:
+  - name: Series
+    description: Content series (collections) management
+  - name: Content
+    description: Content item CRUD and lifecycle management
+  - name: Versions
+    description: Version history and restoration
+  - name: Metadata
+    description: View tracking and analytics
+  - name: Search
+    description: Content search and filtering
+
+security:
+  - cookieAuth: []
+
+paths:
+  # ============================================================================
+  # Series Management Endpoints
+  # ============================================================================
+
+  /series:
+    get:
+      summary: List all series
+      description: |
+        Returns paginated list of content series with content counts.
+        Members only see series with published content.
+        Editors and Admins see all active series.
+
+        **Required Role**: Authenticated user (any role)
+      operationId: listSeries
+      tags:
+        - Series
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of series per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: search
+          in: query
+          description: Search by series title (case-insensitive partial match)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Series list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/SeriesSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create new series
+      description: |
+        Creates a new content series.
+
+        **Required Role**: Admin or Editor
+      operationId: createSeries
+      tags:
+        - Series
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSeriesRequest'
+      responses:
+        '201':
+          description: Series created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesDetailed'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /series/{id}:
+    get:
+      summary: Get series by ID
+      description: |
+        Returns detailed series information with content list.
+        Members only see published content.
+        Editors/Admins see all content with status indicators.
+
+        **Required Role**: Authenticated user (any role)
+      operationId: getSeries
+      tags:
+        - Series
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      responses:
+        '200':
+          description: Series retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesDetailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update series
+      description: |
+        Updates series title and description.
+
+        **Required Role**: Admin or Editor (with series permission)
+      operationId: updateSeries
+      tags:
+        - Series
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSeriesRequest'
+      responses:
+        '200':
+          description: Series updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesDetailed'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete series
+      description: |
+        Soft-deletes series and archives all content within it.
+        Returns count of content items that will be archived.
+
+        **Required Role**: Admin or Editor (who created the series)
+
+        **Business Rule**: Warns user about number of items before deletion
+      operationId: deleteSeries
+      tags:
+        - Series
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      responses:
+        '200':
+          description: Series deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  archivedCount:
+                    type: integer
+                    description: Number of content items archived
+                    example: 15
+                  message:
+                    type: string
+                    example: Series deleted and 15 content items archived
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /series/{id}/analytics:
+    get:
+      summary: Get series analytics
+      description: |
+        Returns analytics for series (total content, total views, most popular items).
+
+        **Required Role**: Admin or Editor (with series permission)
+      operationId: getSeriesAnalytics
+      tags:
+        - Series
+        - Metadata
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      responses:
+        '200':
+          description: Analytics retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesAnalytics'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Content Management Endpoints
+  # ============================================================================
+
+  /series/{seriesId}/content:
+    get:
+      summary: List content in series
+      description: |
+        Returns paginated list of content items in series.
+        Members only see published content.
+        Editors/Admins see all content with status indicators.
+
+        **Required Role**: Authenticated user (any role)
+      operationId: listContentInSeries
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: status
+          in: query
+          description: Filter by status (Editors/Admins only)
+          schema:
+            $ref: '#/components/schemas/ContentStatus'
+      responses:
+        '200':
+          description: Content list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContentSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      summary: Create new content in series
+      description: |
+        Creates a new content item with initial version.
+        Content is created in draft status by default.
+
+        **Required Role**: Admin or Editor (with series permission)
+      operationId: createContent
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/SeriesId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateContentRequest'
+      responses:
+        '201':
+          description: Content created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetailed'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /content/{id}:
+    get:
+      summary: Get content by ID
+      description: |
+        Returns detailed content information.
+        Members see published version.
+        Editors see current version (may include draft changes).
+
+        **Required Role**: Authenticated user (any role)
+
+        **Business Rule**: Members cannot view draft or archived content
+      operationId: getContent
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: Content retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Access denied (draft or archived content)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update content
+      description: |
+        Updates content title and body, creating a new version.
+        If content is published, creates new draft version (doesn't change published version).
+
+        **Required Role**: Admin, content author, or Editor (with series permission)
+      operationId: updateContent
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateContentRequest'
+      responses:
+        '200':
+          description: Content updated successfully (new version created)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetailed'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete content
+      description: |
+        Soft-deletes content (status='archived').
+
+        **Required Role**: Admin, content author, or Editor (with series permission)
+      operationId: deleteContent
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: Content deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Content archived successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /content/{id}/publish:
+    post:
+      summary: Publish content
+      description: |
+        Changes content status to published and sets published_version to current_version.
+        Published content becomes visible to all users.
+
+        **Required Role**: Admin or Editor (with series permission)
+      operationId: publishContent
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: Content published successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetailed'
+        '400':
+          description: Content already published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /content/{id}/archive:
+    post:
+      summary: Archive content
+      description: |
+        Changes content status to archived.
+        Archived content is hidden from members but visible to editors.
+
+        **Required Role**: Admin or Editor (with series permission)
+      operationId: archiveContent
+      tags:
+        - Content
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: Content archived successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentDetailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Version Management Endpoints
+  # ============================================================================
+
+  /content/{id}/versions:
+    get:
+      summary: Get version history for content
+      description: |
+        Returns all versions for content item in chronological order (newest first).
+
+        **Required Role**: Admin, content author, or Editor (with series permission)
+      operationId: getVersionHistory
+      tags:
+        - Versions
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: Version history retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContentVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /content/{id}/versions/{versionNumber}:
+    get:
+      summary: Get specific version
+      description: |
+        Returns full content snapshot for specified version number.
+
+        **Required Role**: Admin, content author, or Editor (with series permission)
+      operationId: getVersion
+      tags:
+        - Versions
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/VersionNumber'
+      responses:
+        '200':
+          description: Version retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /content/{id}/versions/{versionNumber}/restore:
+    post:
+      summary: Restore old version
+      description: |
+        Creates new version with content from specified version number.
+        This preserves history (doesn't modify old version).
+
+        **Required Role**: Admin, content author, or Editor (with series permission)
+      operationId: restoreVersion
+      tags:
+        - Versions
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+        - $ref: '#/components/parameters/VersionNumber'
+      responses:
+        '200':
+          description: Version restored successfully (new version created)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  content:
+                    $ref: '#/components/schemas/ContentDetailed'
+                  newVersion:
+                    $ref: '#/components/schemas/ContentVersion'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Metadata & Analytics Endpoints
+  # ============================================================================
+
+  /content/{id}/view:
+    post:
+      summary: Record content view
+      description: |
+        Increments view count for content.
+        Frontend deduplicates views per session.
+
+        **Required Role**: Authenticated user (any role)
+
+        **Business Rule**: Only published content can have views recorded
+      operationId: recordView
+      tags:
+        - Metadata
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: View recorded successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  view_count:
+                    type: integer
+                    example: 43
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Cannot record view on draft/archived content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /content/{id}/metadata:
+    get:
+      summary: Get content metadata
+      description: |
+        Returns view count and analytics for content.
+
+        **Required Role**: Admin or Editor (with series permission)
+      operationId: getContentMetadata
+      tags:
+        - Metadata
+      parameters:
+        - $ref: '#/components/parameters/ContentId'
+      responses:
+        '200':
+          description: Metadata retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ContentMetadata'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Search Endpoints
+  # ============================================================================
+
+  /content/search:
+    get:
+      summary: Search and filter content
+      description: |
+        Full-text search across content titles and bodies with filtering.
+        Members only see published content.
+        Editors/Admins can search all statuses.
+
+        **Required Role**: Authenticated user (any role)
+      operationId: searchContent
+      tags:
+        - Search
+      parameters:
+        - name: q
+          in: query
+          description: Search query (full-text search)
+          schema:
+            type: string
+          required: true
+        - name: series
+          in: query
+          description: Filter by series ID
+          schema:
+            type: integer
+        - name: author
+          in: query
+          description: Filter by author ID
+          schema:
+            type: integer
+        - name: status
+          in: query
+          description: Filter by status (Editors/Admins only)
+          schema:
+            $ref: '#/components/schemas/ContentStatus'
+        - name: dateFrom
+          in: query
+          description: Filter by published date (from)
+          schema:
+            type: string
+            format: date-time
+        - name: dateTo
+          in: query
+          description: Filter by published date (to)
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        '200':
+          description: Search results retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ContentSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          description: Missing or invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+# ============================================================================
+# Reusable Components
+# ============================================================================
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: JWT token stored in httpOnly cookie
+
+  parameters:
+    SeriesId:
+      name: id
+      in: path
+      required: true
+      description: Series ID
+      schema:
+        type: integer
+        example: 5
+
+    ContentId:
+      name: id
+      in: path
+      required: true
+      description: Content item ID
+      schema:
+        type: integer
+        example: 42
+
+    VersionNumber:
+      name: versionNumber
+      in: path
+      required: true
+      description: Version number
+      schema:
+        type: integer
+        minimum: 1
+        example: 3
+
+  schemas:
+    # Enums
+    SeriesStatus:
+      type: string
+      enum:
+        - active
+        - deleted
+      description: |
+        Series status:
+        - active: Series is visible
+        - deleted: Series soft-deleted (hidden from lists)
+
+    ContentStatus:
+      type: string
+      enum:
+        - draft
+        - published
+        - archived
+      description: |
+        Content lifecycle status:
+        - draft: Editable, not visible to members
+        - published: Visible to all users, frozen
+        - archived: Hidden from members, visible to editors
+
+    # Series Schemas
+    SeriesSummary:
+      type: object
+      description: Summary information for series list
+      required:
+        - id
+        - title
+        - created_by
+        - created_at
+        - content_count
+      properties:
+        id:
+          type: integer
+          example: 5
+        title:
+          type: string
+          example: iRacing Setups
+        description:
+          type: string
+          nullable: true
+          example: Car setup guides and telemetry analysis
+        created_by:
+          type: integer
+          description: User ID of creator
+          example: 10
+        creator_name:
+          type: string
+          example: John Doe
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-01-05T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-01-09T14:30:00Z'
+        content_count:
+          type: integer
+          description: Number of content items in series
+          example: 12
+
+    SeriesDetailed:
+      allOf:
+        - $ref: '#/components/schemas/SeriesSummary'
+        - type: object
+          properties:
+            content:
+              type: array
+              description: Content items in series (paginated separately via /series/{id}/content)
+              items:
+                $ref: '#/components/schemas/ContentSummary'
+
+    CreateSeriesRequest:
+      type: object
+      required:
+        - title
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: iRacing Setups
+        description:
+          type: string
+          maxLength: 2000
+          example: Car setup guides and telemetry analysis
+
+    UpdateSeriesRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: iRacing Setup Guides
+        description:
+          type: string
+          maxLength: 2000
+          example: Updated description
+
+    SeriesAnalytics:
+      type: object
+      required:
+        - series_id
+        - total_content
+        - total_views
+        - avg_views_per_content
+      properties:
+        series_id:
+          type: integer
+          example: 5
+        total_content:
+          type: integer
+          description: Number of published content items
+          example: 12
+        total_views:
+          type: integer
+          description: Sum of all content views in series
+          example: 543
+        avg_views_per_content:
+          type: number
+          format: float
+          description: Average views per content item
+          example: 45.25
+        most_popular:
+          type: array
+          description: Top 5 most viewed content items
+          items:
+            $ref: '#/components/schemas/ContentSummary'
+
+    # Content Schemas
+    ContentSummary:
+      type: object
+      description: Summary information for content list
+      required:
+        - id
+        - series_id
+        - title
+        - author_id
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+          example: 42
+        series_id:
+          type: integer
+          example: 5
+        series_title:
+          type: string
+          example: iRacing Setups
+        title:
+          type: string
+          example: Mazda MX-5 Setup Guide for Laguna Seca
+        author_id:
+          type: integer
+          example: 10
+        author_name:
+          type: string
+          example: John Doe
+        status:
+          $ref: '#/components/schemas/ContentStatus'
+        current_version:
+          type: integer
+          example: 3
+        published_version:
+          type: integer
+          nullable: true
+          description: Version number of published version (null if never published)
+          example: 2
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-01-08T10:00:00Z'
+        published_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-01-08T12:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-01-10T09:30:00Z'
+        view_count:
+          type: integer
+          example: 42
+
+    ContentDetailed:
+      allOf:
+        - $ref: '#/components/schemas/ContentSummary'
+        - type: object
+          required:
+            - body
+          properties:
+            body:
+              type: string
+              description: Full content body (Markdown or plain text)
+              example: "# Setup Overview\n\nThis guide covers optimal setup for..."
+            has_draft_changes:
+              type: boolean
+              description: True if current_version > published_version (Editors only)
+              example: true
+
+    CreateContentRequest:
+      type: object
+      required:
+        - title
+        - body
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: Mazda MX-5 Setup Guide for Laguna Seca
+        body:
+          type: string
+          minLength: 1
+          maxLength: 100000
+          example: "# Setup Overview\n\nThis guide covers..."
+
+    UpdateContentRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: Updated Title
+        body:
+          type: string
+          minLength: 1
+          maxLength: 100000
+          example: "Updated content body..."
+
+    # Version Schemas
+    ContentVersion:
+      type: object
+      description: Immutable content version snapshot
+      required:
+        - id
+        - content_item_id
+        - version_number
+        - title
+        - body
+        - author_id
+        - created_at
+        - is_current
+      properties:
+        id:
+          type: integer
+          example: 100
+        content_item_id:
+          type: integer
+          example: 42
+        version_number:
+          type: integer
+          example: 3
+        title:
+          type: string
+          example: Mazda MX-5 Setup Guide for Laguna Seca
+        body:
+          type: string
+          example: "# Setup Overview\n\n..."
+        author_id:
+          type: integer
+          description: User who created this version
+          example: 10
+        author_name:
+          type: string
+          example: John Doe
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-01-10T09:30:00Z'
+        is_current:
+          type: boolean
+          description: True if this is the current version
+          example: true
+
+    # Metadata Schemas
+    ContentMetadata:
+      type: object
+      required:
+        - content_item_id
+        - view_count
+        - unique_viewer_count
+      properties:
+        content_item_id:
+          type: integer
+          example: 42
+        view_count:
+          type: integer
+          example: 42
+        unique_viewer_count:
+          type: integer
+          description: Number of unique users who viewed (future enhancement)
+          example: 15
+        last_viewed_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-01-10T14:30:00Z'
+
+    # Common Schemas
+    Pagination:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 25
+        total:
+          type: integer
+          description: Total number of items
+          example: 150
+        totalPages:
+          type: integer
+          description: Total number of pages
+          example: 6
+
+    Error:
+      type: object
+      required:
+        - statusCode
+        - error
+        - message
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Validation error
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+    Unauthorized:
+      description: Authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 401
+            error: Unauthorized
+            message: Authentication required
+
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 403
+            error: Forbidden
+            message: You do not have permission to perform this action
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 404
+            error: Not Found
+            message: Resource not found
