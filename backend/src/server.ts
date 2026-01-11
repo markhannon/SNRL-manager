@@ -9,6 +9,7 @@ import { authRoutes } from './api/auth.routes';
 import { userRoutes } from './api/user.routes';
 import { championshipRoutes } from './api/championships.routes';
 import { pointsSchemeRoutes } from './api/pointsSchemes.routes';
+import { eventRoutes } from './api/events.routes';
 import { AppError } from './utils/errors';
 
 /**
@@ -59,6 +60,7 @@ fastify.register(async (instance) => {
   instance.register(seriesRoutes, { prefix: '/api' });
   instance.register(championshipRoutes, { prefix: '/api' });
   instance.register(pointsSchemeRoutes, { prefix: '/api' });
+  instance.register(eventRoutes, { prefix: '/api' });
 }, { prefix: '' });
 
 // Global error handler
