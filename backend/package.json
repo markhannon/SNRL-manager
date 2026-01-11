@@ -1,0 +1,47 @@
+{
+  "name": "snrl-manager-backend",
+  "version": "1.0.0",
+  "description": "SNRL Manager Backend API",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio",
+    "prisma:seed": "tsx prisma/seed.ts"
+  },
+  "keywords": ["snrl", "simracing", "content-management"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@fastify/jwt": "^7.2.4",
+    "@fastify/cors": "^8.5.0",
+    "@fastify/cookie": "^9.2.0",
+    "@fastify/rate-limit": "^9.1.0",
+    "@prisma/client": "^5.8.1",
+    "fastify": "^4.25.2",
+    "bcrypt": "^5.1.1",
+    "pino": "^8.17.2",
+    "pino-pretty": "^10.3.1"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
+    "@types/node": "^20.10.8",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.1.1",
+    "prisma": "^5.8.1",
+    "supertest": "^6.3.3",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.1.1",
+    "@vitest/coverage-v8": "^1.1.1"
+  }
+}
