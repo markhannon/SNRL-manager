@@ -44,6 +44,11 @@ model User {
   content_authored ContentItem[]    @relation("ContentAuthor")
   versions_created ContentVersion[] @relation("VersionAuthor")
 
+  // Relationships from 004-simracing-series
+  championships_created ChampionshipRegistration[] @relation("DriverRegistrations")
+  event_results         EventResult[]              @relation("DriverEventResults")
+  session_results       SessionResult[]            @relation("DriverSessionResults")
+
   @@index([email])
   @@index([role])
   @@index([status])
@@ -230,4 +235,277 @@ model ContentMetadata {
   @@index([view_count(sort: Desc)])
   @@index([last_viewed_at(sort: Desc)])
   @@map("content_metadata")
+}
+
+// ============================================================================
+// Simracing Championship Series (from 004-simracing-series)
+// ============================================================================
+
+enum ChampionshipStatus {
+  DRAFT
+  UPCOMING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum EventStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SessionType {
+  PRACTICE
+  QUALIFYING
+  SPRINT_RACE
+  FEATURE_RACE
+  RACE
+}
+
+enum ResultStatus {
+  CLASSIFIED
+  DNF
+  DNS
+  DSQ
+}
+
+enum RaceLengthUnit {
+  LAPS
+  MINUTES
+  HOURS
+}
+
+enum PenaltyType {
+  TIME_PENALTY
+  POSITION_PENALTY
+  POINTS_DEDUCTION
+}
+
+enum RegistrationStatus {
+  ACTIVE
+  WITHDRAWN
+}
+
+model Championship {
+  id                    Int                         @id @default(autoincrement())
+  name                  String                      @db.VarChar(255)
+  description           String?                     @db.Text
+  simulator             String                      @db.VarChar(100)
+  seasonStart           DateTime                    @db.Date
+  seasonEnd             DateTime                    @db.Date
+  status                ChampionshipStatus          @default(DRAFT)
+  rulesText             String?                     @db.Text
+  rulesDocumentUrl      String?                     @db.VarChar(500)
+  maxParticipants       Int?
+  pointsSchemeId        Int
+  pointsScheme          PointsScheme                @relation(fields: [pointsSchemeId], references: [id])
+  events                Event[]
+  registrations         ChampionshipRegistration[]
+  allowedCars           AllowedCar[]
+  standings             ChampionshipStanding[]
+  calendarSubscriptions CalendarSubscription[]
+  createdBy             Int
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+
+  @@index([status])
+  @@index([simulator])
+  @@index([createdBy])
+  @@index([seasonStart, seasonEnd])
+  @@map("championships")
+}
+
+model ChampionshipRegistration {
+  id               Int                  @id @default(autoincrement())
+  championshipId   Int
+  championship     Championship         @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  driverId         Int
+  driver           User                 @relation("DriverRegistrations", fields: [driverId], references: [id])
+  status           RegistrationStatus   @default(ACTIVE)
+  registeredAt     DateTime             @default(now())
+  withdrawnAt      DateTime?
+  withdrawalReason String?              @db.Text
+
+  @@unique([championshipId, driverId])
+  @@index([driverId])
+  @@index([championshipId, status])
+  @@map("championship_registrations")
+}
+
+model Event {
+  id                    Int             @id @default(autoincrement())
+  championshipId        Int
+  championship          Championship    @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  name                  String          @db.VarChar(255)
+  track                 String          @db.VarChar(255)
+  eventDate             DateTime
+  status                EventStatus     @default(SCHEDULED)
+  raceLengthValue       Int
+  raceLengthUnit        RaceLengthUnit
+  originalEventDate     DateTime?
+  cancellationReason    String?         @db.Text
+  cancelledAt           DateTime?
+  cancelledBy           Int?
+  rescheduleDateHistory Json?
+  raceSessions          RaceSession[]
+  results               EventResult[]
+  createdBy             Int
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([championshipId])
+  @@index([eventDate])
+  @@index([championshipId, status])
+  @@index([championshipId, eventDate])
+  @@map("events")
+}
+
+model RaceSession {
+  id                 Int            @id @default(autoincrement())
+  eventId            Int
+  event              Event          @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  sessionName        String         @db.VarChar(255)
+  sessionType        SessionType
+  sessionOrder       Int
+  durationValue      Int
+  durationUnit       RaceLengthUnit
+  pointsMultiplier   Float          @default(1.0)
+  scheduledStartTime DateTime?
+  results            SessionResult[]
+
+  @@index([eventId])
+  @@index([eventId, sessionOrder])
+  @@map("race_sessions")
+}
+
+model EventResult {
+  id                  Int          @id @default(autoincrement())
+  eventId             Int
+  event               Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  driverId            Int
+  driver              User         @relation("DriverEventResults", fields: [driverId], references: [id])
+  finishingPosition   Int?
+  originalPosition    Int?
+  resultStatus        ResultStatus @default(CLASSIFIED)
+  penalties           Json?
+  pointsAwarded       Int          @default(0)
+  isDraft             Boolean      @default(true)
+  publishedAt         DateTime?
+  enteredBy           Int
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  modificationHistory Json?
+
+  @@unique([eventId, driverId])
+  @@index([driverId])
+  @@index([eventId, resultStatus])
+  @@index([eventId, driverId, resultStatus, pointsAwarded])
+  @@map("event_results")
+}
+
+model SessionResult {
+  id                  Int          @id @default(autoincrement())
+  sessionId           Int
+  session             RaceSession  @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  driverId            Int
+  driver              User         @relation("DriverSessionResults", fields: [driverId], references: [id])
+  finishingPosition   Int?
+  originalPosition    Int?
+  resultStatus        ResultStatus @default(CLASSIFIED)
+  penalties           Json?
+  pointsAwarded       Int          @default(0)
+  isDraft             Boolean      @default(true)
+  publishedAt         DateTime?
+  enteredBy           Int
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  modificationHistory Json?
+
+  @@unique([sessionId, driverId])
+  @@index([driverId])
+  @@index([sessionId, resultStatus])
+  @@map("session_results")
+}
+
+model PointsScheme {
+  id            Int            @id @default(autoincrement())
+  name          String         @db.VarChar(255)
+  description   String?        @db.Text
+  pointsMapping Json
+  bonusPoints   Json?
+  dropScores    Int            @default(0)
+  championships Championship[]
+  createdBy     Int
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([name])
+  @@map("points_schemes")
+}
+
+model ChampionshipStanding {
+  id                 Int          @id @default(autoincrement())
+  championshipId     Int
+  championship       Championship @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  driverId           Int
+  totalPoints        Int          @default(0)
+  eventsParticipated Int          @default(0)
+  wins               Int          @default(0)
+  podiums            Int          @default(0)
+  bestFinish         Int?
+  position           Int
+  pointsBreakdown    Json
+  lastCalculated     DateTime     @default(now())
+
+  @@unique([championshipId, driverId])
+  @@index([championshipId, position])
+  @@index([championshipId, totalPoints])
+  @@map("championship_standings")
+}
+
+model AllowedCar {
+  id             Int          @id @default(autoincrement())
+  championshipId Int
+  championship   Championship @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  carName        String       @db.VarChar(255)
+  carClass       String?      @db.VarChar(100)
+
+  @@unique([championshipId, carName])
+  @@index([championshipId])
+  @@map("allowed_cars")
+}
+
+model ChampionshipImport {
+  id                     Int       @id @default(autoincrement())
+  sourceUrl              String    @db.VarChar(1000)
+  parsedChampionshipName String?   @db.VarChar(255)
+  parsedSeasonStart      DateTime? @db.Date
+  parsedSeasonEnd        DateTime? @db.Date
+  parsedEvents           Json?
+  status                 String    @db.VarChar(50)
+  errorMessage           String?   @db.Text
+  createdBy              Int
+  createdAt              DateTime  @default(now())
+  importedAs             Int?
+
+  @@index([createdBy])
+  @@index([status])
+  @@map("championship_imports")
+}
+
+model CalendarSubscription {
+  id             Int          @id @default(autoincrement())
+  championshipId Int
+  championship   Championship @relation(fields: [championshipId], references: [id], onDelete: Cascade)
+  token          String       @unique @db.VarChar(64)
+  userId         Int?
+  createdAt      DateTime     @default(now())
+  lastAccessedAt DateTime?
+  accessCount    Int          @default(0)
+
+  @@index([championshipId])
+  @@index([token])
+  @@map("calendar_subscriptions")
 }
