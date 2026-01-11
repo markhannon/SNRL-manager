@@ -1,0 +1,909 @@
+openapi: 3.0.3
+info:
+  title: SNRL Manager - Admin User Management API
+  description: |
+    REST API for admin user management, authentication, and authorization.
+
+    This API provides endpoints for:
+    - User authentication (login/logout)
+    - User account management (CRUD operations)
+    - Role-based access control
+    - Series-specific permission management
+    - Administrative activity audit logging
+
+    **Feature**: 001-admin-user
+    **Date**: 2026-01-10
+  version: 1.0.0
+  contact:
+    name: SNRL Manager API Support
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development server
+  - url: https://staging.snrl.example/api
+    description: Staging environment
+  - url: https://snrl.example/api
+    description: Production environment
+
+tags:
+  - name: Authentication
+    description: User login and session management
+  - name: Users
+    description: User account management (admin only)
+  - name: Permissions
+    description: Series-specific permission management (admin only)
+  - name: Admin
+    description: Administrative operations and audit logging
+
+security:
+  - cookieAuth: []
+
+paths:
+  # ============================================================================
+  # Authentication Endpoints
+  # ============================================================================
+
+  /auth/login:
+    post:
+      summary: Authenticate user and create session
+      description: |
+        Authenticates user with email and password, returns JWT token in httpOnly cookie.
+        Token expires after 24 hours.
+      operationId: login
+      tags:
+        - Authentication
+      security: []  # No auth required for login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@snrl.example
+                password:
+                  type: string
+                  format: password
+                  example: SecurePassword123
+      responses:
+        '200':
+          description: Login successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...; Path=/; HttpOnly; Secure; SameSite=Strict
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/UserPublic'
+                  message:
+                    type: string
+                    example: Login successful
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                statusCode: 401
+                error: Unauthorized
+                message: Invalid email or password
+        '429':
+          description: Too many login attempts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      summary: Logout user and invalidate session
+      description: |
+        Invalidates current JWT token and clears authentication cookie.
+        Token is added to blacklist to prevent further use.
+      operationId: logout
+      tags:
+        - Authentication
+      responses:
+        '200':
+          description: Logout successful
+          headers:
+            Set-Cookie:
+              schema:
+                type: string
+                example: token=; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=0
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logout successful
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ============================================================================
+  # User Management Endpoints
+  # ============================================================================
+
+  /users:
+    get:
+      summary: List all users
+      description: |
+        Returns paginated list of users with optional filtering and search.
+        Deleted users are excluded by default.
+
+        **Required Role**: Admin
+      operationId: listUsers
+      tags:
+        - Users
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of users per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: role
+          in: query
+          description: Filter by role
+          schema:
+            $ref: '#/components/schemas/UserRole'
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            $ref: '#/components/schemas/UserStatus'
+        - name: search
+          in: query
+          description: Search by name or email (case-insensitive partial match)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User list retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/UserPublic'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      summary: Create new user
+      description: |
+        Creates a new user account with specified role.
+        Password is hashed before storage.
+
+        **Required Role**: Admin
+      operationId: createUser
+      tags:
+        - Users
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                emailExists:
+                  value:
+                    statusCode: 400
+                    error: Bad Request
+                    message: Email already exists
+                weakPassword:
+                  value:
+                    statusCode: 400
+                    error: Bad Request
+                    message: Password must be at least 8 characters with uppercase, lowercase, and number
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/{id}:
+    get:
+      summary: Get user by ID
+      description: |
+        Returns detailed user information including series-specific permissions.
+
+        **Required Role**: Admin
+      operationId: getUser
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDetailed'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    put:
+      summary: Update user
+      description: |
+        Updates user details (name, role, status).
+        Email and password cannot be changed via this endpoint.
+        Role changes are logged in activity log.
+
+        **Required Role**: Admin
+
+        **Business Rules**:
+        - Cannot demote last admin user
+        - Role changes invalidate active sessions
+      operationId: updateUser
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRequest'
+      responses:
+        '200':
+          description: User updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '400':
+          description: Validation error or business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                lastAdmin:
+                  value:
+                    statusCode: 400
+                    error: Bad Request
+                    message: Cannot change role of last admin user
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      summary: Delete user (soft delete)
+      description: |
+        Soft-deletes user by setting status to 'deleted'.
+        User data is preserved for audit trail.
+        User cannot log in after deletion.
+
+        **Required Role**: Admin
+
+        **Business Rules**:
+        - Cannot delete last admin user
+        - Deletion is logged in activity log
+      operationId: deleteUser
+      tags:
+        - Users
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: User deleted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: User deleted successfully
+        '400':
+          description: Business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                statusCode: 400
+                error: Bad Request
+                message: Cannot delete last admin user
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ============================================================================
+  # Series Permission Endpoints
+  # ============================================================================
+
+  /users/{id}/permissions:
+    get:
+      summary: List user's series-specific permissions
+      description: |
+        Returns all series-specific permissions granted to the user.
+
+        **Required Role**: Admin
+      operationId: listUserPermissions
+      tags:
+        - Permissions
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Permissions retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SeriesPermission'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    post:
+      summary: Grant series-specific permission
+      description: |
+        Grants editor permission for specific series to a Member user.
+
+        **Required Role**: Admin
+
+        **Business Rules**:
+        - User must have Member role (not Admin or Editor)
+        - Cannot grant duplicate permission
+        - Grant is logged in activity log
+      operationId: grantPermission
+      tags:
+        - Permissions
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantPermissionRequest'
+      responses:
+        '201':
+          description: Permission granted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeriesPermission'
+        '400':
+          description: Validation error or business rule violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                invalidRole:
+                  value:
+                    statusCode: 400
+                    error: Bad Request
+                    message: Can only grant series permissions to Member users
+                duplicate:
+                  value:
+                    statusCode: 400
+                    error: Bad Request
+                    message: User already has permission for this series
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{id}/permissions/{seriesId}:
+    delete:
+      summary: Revoke series-specific permission
+      description: |
+        Revokes series-specific editor permission from user.
+        User immediately returns to base role permissions.
+
+        **Required Role**: Admin
+
+        **Business Rules**:
+        - Revocation is logged in activity log
+      operationId: revokePermission
+      tags:
+        - Permissions
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: seriesId
+          in: path
+          required: true
+          description: ID of the series
+          schema:
+            type: integer
+            example: 123
+      responses:
+        '200':
+          description: Permission revoked successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Permission revoked successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          description: User or permission not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # ============================================================================
+  # Admin Activity Log Endpoints
+  # ============================================================================
+
+  /admin/activity-log:
+    get:
+      summary: View administrative activity log
+      description: |
+        Returns paginated activity log with optional filtering.
+        Shows all administrative actions for audit and compliance.
+
+        **Required Role**: Admin
+      operationId: getActivityLog
+      tags:
+        - Admin
+      parameters:
+        - name: page
+          in: query
+          description: Page number (1-indexed)
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: limit
+          in: query
+          description: Number of entries per page
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: adminId
+          in: query
+          description: Filter by admin user ID
+          schema:
+            type: integer
+        - name: action
+          in: query
+          description: Filter by action type
+          schema:
+            $ref: '#/components/schemas/ActivityAction'
+        - name: startDate
+          in: query
+          description: Filter entries after this date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+        - name: endDate
+          in: query
+          description: Filter entries before this date (ISO 8601)
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Activity log retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ActivityLogEntry'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+# ============================================================================
+# Reusable Components
+# ============================================================================
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: token
+      description: JWT token stored in httpOnly cookie
+
+  parameters:
+    UserId:
+      name: id
+      in: path
+      required: true
+      description: User ID
+      schema:
+        type: integer
+        example: 42
+
+  schemas:
+    # Enums
+    UserRole:
+      type: string
+      enum:
+        - admin
+        - editor
+        - member
+      description: |
+        User role defining system-wide permissions:
+        - admin: Full system access, can manage all users
+        - editor: Can create/edit content, create championships
+        - member: Basic access, can register for championships
+
+    UserStatus:
+      type: string
+      enum:
+        - active
+        - inactive
+        - deleted
+      description: |
+        User account status:
+        - active: User can log in and access the system
+        - inactive: User temporarily deactivated, cannot log in
+        - deleted: User soft-deleted, cannot log in
+
+    PermissionLevel:
+      type: string
+      enum:
+        - editor
+      description: Series-specific permission level (currently only 'editor')
+
+    ActivityAction:
+      type: string
+      enum:
+        - create_user
+        - update_user
+        - delete_user
+        - change_role
+        - grant_permission
+        - revoke_permission
+        - activate_user
+        - deactivate_user
+      description: Type of administrative action
+
+    TargetEntityType:
+      type: string
+      enum:
+        - user
+        - series_permission
+      description: Type of entity affected by admin action
+
+    # User Schemas
+    UserPublic:
+      type: object
+      description: Public user information (password_hash excluded)
+      required:
+        - id
+        - email
+        - role
+        - status
+        - created_at
+      properties:
+        id:
+          type: integer
+          example: 42
+        email:
+          type: string
+          format: email
+          example: user@snrl.example
+        name:
+          type: string
+          nullable: true
+          example: John Doe
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        created_at:
+          type: string
+          format: date-time
+          example: '2026-01-10T10:00:00Z'
+        updated_at:
+          type: string
+          format: date-time
+          example: '2026-01-10T14:30:00Z'
+        last_login:
+          type: string
+          format: date-time
+          nullable: true
+          example: '2026-01-10T09:15:00Z'
+
+    UserDetailed:
+      allOf:
+        - $ref: '#/components/schemas/UserPublic'
+        - type: object
+          properties:
+            series_permissions:
+              type: array
+              items:
+                $ref: '#/components/schemas/SeriesPermission'
+
+    CreateUserRequest:
+      type: object
+      required:
+        - email
+        - password
+        - role
+      properties:
+        email:
+          type: string
+          format: email
+          example: newuser@snrl.example
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: SecurePassword123
+          description: Must be at least 8 characters with uppercase, lowercase, and number
+        name:
+          type: string
+          example: Jane Smith
+        role:
+          $ref: '#/components/schemas/UserRole'
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          example: Jane Smith
+        role:
+          $ref: '#/components/schemas/UserRole'
+        status:
+          $ref: '#/components/schemas/UserStatus'
+
+    # Permission Schemas
+    SeriesPermission:
+      type: object
+      required:
+        - id
+        - user_id
+        - series_id
+        - permission_level
+        - granted_by
+        - granted_at
+      properties:
+        id:
+          type: integer
+          example: 10
+        user_id:
+          type: integer
+          example: 42
+        series_id:
+          type: integer
+          example: 123
+        permission_level:
+          $ref: '#/components/schemas/PermissionLevel'
+        granted_by:
+          type: integer
+          example: 1
+          description: Admin user ID who granted this permission
+        granted_at:
+          type: string
+          format: date-time
+          example: '2026-01-10T12:00:00Z'
+        granter:
+          type: object
+          description: Details of admin who granted permission
+          properties:
+            id:
+              type: integer
+              example: 1
+            email:
+              type: string
+              example: admin@snrl.example
+            name:
+              type: string
+              example: System Admin
+
+    GrantPermissionRequest:
+      type: object
+      required:
+        - series_id
+      properties:
+        series_id:
+          type: integer
+          example: 123
+          description: ID of the series to grant editor permission for
+        permission_level:
+          $ref: '#/components/schemas/PermissionLevel'
+          default: editor
+
+    # Activity Log Schemas
+    ActivityLogEntry:
+      type: object
+      required:
+        - id
+        - timestamp
+        - admin_id
+        - action
+        - target_entity_type
+        - target_entity_id
+      properties:
+        id:
+          type: integer
+          example: 456
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-01-10T14:30:00Z'
+        admin_id:
+          type: integer
+          example: 1
+        action:
+          $ref: '#/components/schemas/ActivityAction'
+        target_entity_type:
+          $ref: '#/components/schemas/TargetEntityType'
+        target_entity_id:
+          type: integer
+          example: 42
+        changes:
+          type: object
+          nullable: true
+          description: JSON object with before/after values
+          example:
+            role:
+              before: member
+              after: editor
+        admin:
+          type: object
+          description: Details of admin who performed action
+          properties:
+            id:
+              type: integer
+              example: 1
+            email:
+              type: string
+              example: admin@snrl.example
+            name:
+              type: string
+              example: System Admin
+
+    # Utility Schemas
+    Pagination:
+      type: object
+      required:
+        - page
+        - limit
+        - total
+        - totalPages
+      properties:
+        page:
+          type: integer
+          example: 1
+          description: Current page number (1-indexed)
+        limit:
+          type: integer
+          example: 25
+          description: Number of items per page
+        total:
+          type: integer
+          example: 150
+          description: Total number of items
+        totalPages:
+          type: integer
+          example: 6
+          description: Total number of pages
+
+    Error:
+      type: object
+      required:
+        - statusCode
+        - error
+        - message
+      properties:
+        statusCode:
+          type: integer
+          example: 400
+        error:
+          type: string
+          example: Bad Request
+        message:
+          type: string
+          example: Email already exists
+
+  responses:
+    Unauthorized:
+      description: Not authenticated or invalid token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 401
+            error: Unauthorized
+            message: Invalid or expired token
+
+    Forbidden:
+      description: Authenticated but insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 403
+            error: Forbidden
+            message: Admin role required
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            statusCode: 404
+            error: Not Found
+            message: User not found

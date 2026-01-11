@@ -1,0 +1,1687 @@
+openapi: 3.0.3
+info:
+  title: SNRL Manager - Simracing Championship Series API
+  version: 1.0.0
+  description: |
+    API for managing simracing championships, events, race results, and standings.
+
+    ## Authentication
+
+    All endpoints requiring authentication use JWT Bearer tokens passed in the Authorization header:
+    ```
+    Authorization: Bearer <token>
+    ```
+
+    ## User Roles
+
+    - **Admin**: Full system access, can manage all championships
+    - **Editor**: Can create and manage their own championships
+    - **Member**: Can register for championships and view content
+
+    ## Championship Roles
+
+    - **Organizer**: Creator of a championship, has full control over their championship
+
+  contact:
+    name: SNRL Manager API Support
+    url: https://snrl-manager.example.com
+
+servers:
+  - url: http://localhost:3001/api
+    description: Local development server
+  - url: https://api.snrl-manager.example.com/api
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Championships
+    description: Championship management endpoints
+  - name: Events
+    description: Event management endpoints
+  - name: Results
+    description: Race results management endpoints
+  - name: Standings
+    description: Championship standings endpoints
+  - name: Calendar
+    description: Calendar export and subscription endpoints
+  - name: Registration
+    description: Championship registration endpoints
+  - name: Points Schemes
+    description: Points scheme management endpoints
+  - name: Import
+    description: Championship import from external URLs
+
+paths:
+  # ==================== CHAMPIONSHIPS ====================
+
+  /championships:
+    get:
+      summary: List championships
+      description: Get a list of championships with optional filtering
+      tags: [Championships]
+      security: []  # Public endpoint
+      parameters:
+        - name: simulator
+          in: query
+          description: Filter by simulator
+          schema:
+            type: string
+            example: iRacing
+        - name: status
+          in: query
+          description: Filter by status
+          schema:
+            type: string
+            enum: [DRAFT, UPCOMING, ACTIVE, COMPLETED, CANCELLED]
+        - name: search
+          in: query
+          description: Search championships by name
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Number of results per page
+          schema:
+            type: integer
+            default: 25
+            minimum: 1
+            maximum: 100
+        - name: offset
+          in: query
+          description: Number of results to skip
+          schema:
+            type: integer
+            default: 0
+            minimum: 0
+      responses:
+        '200':
+          description: List of championships
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/ChampionshipSummary'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      summary: Create championship
+      description: Create a new championship (requires Editor or Admin role)
+      tags: [Championships]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateChampionshipRequest'
+      responses:
+        '201':
+          description: Championship created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Championship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /championships/{id}:
+    get:
+      summary: Get championship details
+      description: Retrieve detailed information about a championship
+      tags: [Championships]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      responses:
+        '200':
+          description: Championship details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChampionshipDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      summary: Update championship
+      description: Update championship details (requires organizer or admin)
+      tags: [Championships]
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateChampionshipRequest'
+      responses:
+        '200':
+          description: Championship updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Championship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      summary: Delete championship
+      description: |
+        Delete a championship (requires organizer or admin).
+        Soft-delete if championship has events with results, hard-delete otherwise.
+      tags: [Championships]
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      responses:
+        '204':
+          description: Championship deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot delete championship with historical data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== EVENTS ====================
+
+  /championships/{id}/events:
+    get:
+      summary: List championship events
+      description: Get all events for a championship in chronological order
+      tags: [Events]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+        - name: status
+          in: query
+          description: Filter by event status
+          schema:
+            type: string
+            enum: [SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED]
+      responses:
+        '200':
+          description: List of events
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Event'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      summary: Create event
+      description: Create a new event within a championship (requires organizer or admin)
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEventRequest'
+      responses:
+        '201':
+          description: Event created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}:
+    get:
+      summary: Get event details
+      description: Retrieve detailed information about an event
+      tags: [Events]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: Event details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventDetails'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    put:
+      summary: Update event
+      description: Update event details (requires organizer or admin)
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEventRequest'
+      responses:
+        '200':
+          description: Event updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      summary: Delete event
+      description: Delete an event (requires organizer or admin). Cannot delete if results exist.
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '204':
+          description: Event deleted successfully
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot delete event with results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}/cancel:
+    post:
+      summary: Cancel event
+      description: |
+        Cancel a scheduled event (requires organizer or admin).
+        Cannot cancel events with published results.
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  description: Reason for cancellation
+                  example: Insufficient participants
+      responses:
+        '200':
+          description: Event cancelled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot cancel event (already completed or has results)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}/reschedule:
+    post:
+      summary: Reschedule event
+      description: Change event date (requires organizer or admin)
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [newDate]
+              properties:
+                newDate:
+                  type: string
+                  format: date-time
+                  description: New event date and time
+                  example: '2026-04-15T14:00:00Z'
+      responses:
+        '200':
+          description: Event rescheduled successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}/reinstate:
+    post:
+      summary: Reinstate cancelled event
+      description: Restore a cancelled event to scheduled status (requires organizer or admin)
+      tags: [Events]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                newDate:
+                  type: string
+                  format: date-time
+                  description: Optional new date when reinstating
+                  example: '2026-04-15T14:00:00Z'
+      responses:
+        '200':
+          description: Event reinstated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Event'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot reinstate event (not in cancelled status)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== RESULTS ====================
+
+  /events/{id}/results:
+    get:
+      summary: Get event results
+      description: Retrieve results for an event
+      tags: [Results]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+        - name: includeDraft
+          in: query
+          description: Include draft results (requires organizer or admin)
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Event results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventResult'
+                  isDraft:
+                    type: boolean
+                  publishedAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      summary: Enter event results
+      description: |
+        Enter race results for an event (requires organizer or admin).
+        Results are saved as draft until published.
+      tags: [Results]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnterResultsRequest'
+      responses:
+        '201':
+          description: Results entered successfully (draft)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/EventResult'
+                  isDraft:
+                    type: boolean
+                    example: true
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /results/{id}:
+    put:
+      summary: Update result
+      description: Update a specific result (requires organizer or admin)
+      tags: [Results]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Result ID
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateResultRequest'
+      responses:
+        '200':
+          description: Result updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot update published results without unpublishing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /results/{id}/publish:
+    post:
+      summary: Publish results
+      description: |
+        Publish results for an event (requires organizer or admin).
+        This makes results final and triggers standings recalculation.
+      tags: [Results]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Result ID (or use /events/{id}/results/publish to publish all)
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Results published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  published:
+                    type: boolean
+                    example: true
+                  publishedAt:
+                    type: string
+                    format: date-time
+                  standingsUpdated:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /events/{id}/results/publish:
+    post:
+      summary: Publish all event results
+      description: Publish all results for an event at once
+      tags: [Results]
+      parameters:
+        - $ref: '#/components/parameters/EventId'
+      responses:
+        '200':
+          description: All results published successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  published:
+                    type: boolean
+                    example: true
+                  publishedAt:
+                    type: string
+                    format: date-time
+                  resultsCount:
+                    type: integer
+                  standingsUpdated:
+                    type: boolean
+                    example: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== STANDINGS ====================
+
+  /championships/{id}/standings:
+    get:
+      summary: Get championship standings
+      description: Retrieve current championship standings
+      tags: [Standings]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      responses:
+        '200':
+          description: Championship standings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  championshipId:
+                    type: integer
+                  lastCalculated:
+                    type: string
+                    format: date-time
+                  standings:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Standing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /championships/{id}/standings/history:
+    get:
+      summary: Get historical standings
+      description: Retrieve standings evolution over time
+      tags: [Standings]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+        - name: afterEvent
+          in: query
+          description: Event ID to get standings after
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Historical standings
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  championshipId:
+                    type: integer
+                  history:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        eventId:
+                          type: integer
+                        eventName:
+                          type: string
+                        standings:
+                          type: array
+                          items:
+                            $ref: '#/components/schemas/Standing'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== CALENDAR ====================
+
+  /championships/{id}/calendar.ics:
+    get:
+      summary: Download championship calendar
+      description: Download ICS calendar file for championship events
+      tags: [Calendar]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      responses:
+        '200':
+          description: ICS calendar file
+          content:
+            text/calendar:
+              schema:
+                type: string
+                example: |
+                  BEGIN:VCALENDAR
+                  VERSION:2.0
+                  PRODID:-//SNRL Manager//EN
+                  BEGIN:VEVENT
+                  SUMMARY:Round 1 - Spa-Francorchamps
+                  DTSTART:20260315T140000Z
+                  DTEND:20260315T160000Z
+                  LOCATION:Spa-Francorchamps
+                  DESCRIPTION:Track: Spa-Francorchamps
+                  END:VEVENT
+                  END:VCALENDAR
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /championships/{id}/calendar/subscribe:
+    post:
+      summary: Create calendar subscription
+      description: Get a subscription URL for calendar auto-updates (requires authentication)
+      tags: [Calendar]
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      responses:
+        '201':
+          description: Subscription created successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subscriptionUrl:
+                    type: string
+                    format: uri
+                    example: webcal://api.example.com/calendar/feed/abc123xyz789
+                  token:
+                    type: string
+                    example: abc123xyz789
+                  expiresAt:
+                    type: string
+                    format: date-time
+                    nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /calendar/feed/{token}:
+    get:
+      summary: Calendar subscription feed
+      description: Subscription endpoint for calendar applications
+      tags: [Calendar]
+      security: []  # Uses token authentication
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: Subscription token
+          schema:
+            type: string
+      responses:
+        '200':
+          description: ICS calendar feed
+          content:
+            text/calendar:
+              schema:
+                type: string
+        '403':
+          description: Invalid or expired token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          description: Championship deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== REGISTRATION ====================
+
+  /championships/{id}/register:
+    post:
+      summary: Register for championship
+      description: Register the authenticated user for a championship
+      tags: [Registration]
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      responses:
+        '201':
+          description: Registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Already registered or championship full
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    delete:
+      summary: Withdraw from championship
+      description: Withdraw the authenticated user from a championship
+      tags: [Registration]
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: Optional reason for withdrawal
+                  example: Schedule conflict
+      responses:
+        '200':
+          description: Withdrawn successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Registration'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Cannot withdraw (events already completed)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /championships/{id}/participants:
+    get:
+      summary: List championship participants
+      description: Get all registered participants for a championship
+      tags: [Registration]
+      security: []  # Public endpoint
+      parameters:
+        - $ref: '#/components/parameters/ChampionshipId'
+        - name: status
+          in: query
+          description: Filter by registration status
+          schema:
+            type: string
+            enum: [ACTIVE, WITHDRAWN]
+      responses:
+        '200':
+          description: List of participants
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Registration'
+                  totalActive:
+                    type: integer
+                  totalWithdrawn:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== POINTS SCHEMES ====================
+
+  /points-schemes:
+    get:
+      summary: List points schemes
+      description: Get all available points schemes
+      tags: [Points Schemes]
+      security: []  # Public endpoint
+      responses:
+        '200':
+          description: List of points schemes
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/PointsScheme'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+    post:
+      summary: Create points scheme
+      description: Create a new points scheme (requires Editor or Admin role)
+      tags: [Points Schemes]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePointsSchemeRequest'
+      responses:
+        '201':
+          description: Points scheme created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PointsScheme'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  # ==================== IMPORT ====================
+
+  /championships/import:
+    post:
+      summary: Import championship from URL
+      description: |
+        Parse championship data from external URL and create draft championship.
+        Returns parsed data for review before finalizing.
+      tags: [Import]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sourceUrl]
+              properties:
+                sourceUrl:
+                  type: string
+                  format: uri
+                  example: https://www.formula1.com/en/racing/2026
+      responses:
+        '201':
+          description: Championship import initiated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  importId:
+                    type: integer
+                  status:
+                    type: string
+                    enum: [parsing, ready_for_review, failed]
+                  parsedData:
+                    $ref: '#/components/schemas/ParsedChampionshipData'
+                  errors:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /championships/import/{importId}/finalize:
+    post:
+      summary: Finalize championship import
+      description: Create championship from parsed import data
+      tags: [Import]
+      parameters:
+        - name: importId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [simulator, pointsSchemeId]
+              properties:
+                simulator:
+                  type: string
+                  example: iRacing
+                pointsSchemeId:
+                  type: integer
+                trackMappings:
+                  type: object
+                  description: Map parsed track names to simulator tracks
+                  example:
+                    'Spa-Francorchamps': 'Circuit de Spa-Francorchamps'
+                allowedCars:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        '201':
+          description: Championship created from import
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Championship'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+# ==================== COMPONENTS ====================
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    ChampionshipId:
+      name: id
+      in: path
+      required: true
+      description: Championship ID
+      schema:
+        type: integer
+        minimum: 1
+
+    EventId:
+      name: id
+      in: path
+      required: true
+      description: Event ID
+      schema:
+        type: integer
+        minimum: 1
+
+  schemas:
+    # Championship schemas
+    ChampionshipSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        simulator:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, UPCOMING, ACTIVE, COMPLETED, CANCELLED]
+        seasonStart:
+          type: string
+          format: date
+        seasonEnd:
+          type: string
+          format: date
+        participantCount:
+          type: integer
+        eventCount:
+          type: integer
+
+    Championship:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        simulator:
+          type: string
+        seasonStart:
+          type: string
+          format: date
+        seasonEnd:
+          type: string
+          format: date
+        status:
+          type: string
+          enum: [DRAFT, UPCOMING, ACTIVE, COMPLETED, CANCELLED]
+        rulesText:
+          type: string
+          nullable: true
+        rulesDocumentUrl:
+          type: string
+          nullable: true
+        maxParticipants:
+          type: integer
+          nullable: true
+        pointsSchemeId:
+          type: integer
+        createdBy:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    ChampionshipDetails:
+      allOf:
+        - $ref: '#/components/schemas/Championship'
+        - type: object
+          properties:
+            pointsScheme:
+              $ref: '#/components/schemas/PointsScheme'
+            allowedCars:
+              type: array
+              items:
+                type: string
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/Event'
+            participantCount:
+              type: integer
+
+    CreateChampionshipRequest:
+      type: object
+      required: [name, simulator, seasonStart, seasonEnd, pointsSchemeId]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        simulator:
+          type: string
+          example: iRacing
+        seasonStart:
+          type: string
+          format: date
+        seasonEnd:
+          type: string
+          format: date
+        rulesText:
+          type: string
+        rulesDocumentUrl:
+          type: string
+          format: uri
+        maxParticipants:
+          type: integer
+          minimum: 1
+        pointsSchemeId:
+          type: integer
+        allowedCars:
+          type: array
+          items:
+            type: string
+
+    UpdateChampionshipRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        rulesText:
+          type: string
+        rulesDocumentUrl:
+          type: string
+          format: uri
+        maxParticipants:
+          type: integer
+          minimum: 1
+        allowedCars:
+          type: array
+          items:
+            type: string
+
+    # Event schemas
+    Event:
+      type: object
+      properties:
+        id:
+          type: integer
+        championshipId:
+          type: integer
+        name:
+          type: string
+        track:
+          type: string
+        eventDate:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [SCHEDULED, IN_PROGRESS, COMPLETED, CANCELLED]
+        raceLengthValue:
+          type: integer
+        raceLengthUnit:
+          type: string
+          enum: [LAPS, MINUTES, HOURS]
+        originalEventDate:
+          type: string
+          format: date-time
+          nullable: true
+        cancellationReason:
+          type: string
+          nullable: true
+        cancelledAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    EventDetails:
+      allOf:
+        - $ref: '#/components/schemas/Event'
+        - type: object
+          properties:
+            championship:
+              $ref: '#/components/schemas/ChampionshipSummary'
+            raceSessions:
+              type: array
+              items:
+                $ref: '#/components/schemas/RaceSession'
+            hasResults:
+              type: boolean
+
+    CreateEventRequest:
+      type: object
+      required: [name, track, eventDate, raceLengthValue, raceLengthUnit]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        track:
+          type: string
+        eventDate:
+          type: string
+          format: date-time
+        raceLengthValue:
+          type: integer
+          minimum: 1
+        raceLengthUnit:
+          type: string
+          enum: [LAPS, MINUTES, HOURS]
+
+    UpdateEventRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        track:
+          type: string
+        eventDate:
+          type: string
+          format: date-time
+        raceLengthValue:
+          type: integer
+          minimum: 1
+        raceLengthUnit:
+          type: string
+          enum: [LAPS, MINUTES, HOURS]
+
+    # Race Session schema
+    RaceSession:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        sessionName:
+          type: string
+        sessionType:
+          type: string
+          enum: [PRACTICE, QUALIFYING, SPRINT_RACE, FEATURE_RACE, RACE]
+        sessionOrder:
+          type: integer
+        durationValue:
+          type: integer
+        durationUnit:
+          type: string
+          enum: [LAPS, MINUTES, HOURS]
+        pointsMultiplier:
+          type: number
+          format: float
+        scheduledStartTime:
+          type: string
+          format: date-time
+          nullable: true
+
+    # Result schemas
+    EventResult:
+      type: object
+      properties:
+        id:
+          type: integer
+        eventId:
+          type: integer
+        driverId:
+          type: integer
+        driverName:
+          type: string
+        finishingPosition:
+          type: integer
+          nullable: true
+        originalPosition:
+          type: integer
+          nullable: true
+        resultStatus:
+          type: string
+          enum: [CLASSIFIED, DNF, DNS, DSQ]
+        penalties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Penalty'
+        pointsAwarded:
+          type: integer
+        isDraft:
+          type: boolean
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    Penalty:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [TIME_PENALTY, POSITION_PENALTY, POINTS_DEDUCTION]
+        value:
+          type: integer
+          description: Seconds, positions, or points depending on type
+        reason:
+          type: string
+
+    EnterResultsRequest:
+      type: object
+      required: [results]
+      properties:
+        results:
+          type: array
+          items:
+            type: object
+            required: [driverId]
+            properties:
+              driverId:
+                type: integer
+              finishingPosition:
+                type: integer
+                nullable: true
+              resultStatus:
+                type: string
+                enum: [CLASSIFIED, DNF, DNS, DSQ]
+                default: CLASSIFIED
+              penalties:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Penalty'
+
+    UpdateResultRequest:
+      type: object
+      properties:
+        finishingPosition:
+          type: integer
+          nullable: true
+        resultStatus:
+          type: string
+          enum: [CLASSIFIED, DNF, DNS, DSQ]
+        penalties:
+          type: array
+          items:
+            $ref: '#/components/schemas/Penalty'
+
+    # Standing schema
+    Standing:
+      type: object
+      properties:
+        position:
+          type: integer
+        driverId:
+          type: integer
+        driverName:
+          type: string
+        totalPoints:
+          type: integer
+        eventsParticipated:
+          type: integer
+        wins:
+          type: integer
+        podiums:
+          type: integer
+        bestFinish:
+          type: integer
+          nullable: true
+        pointsBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              eventId:
+                type: integer
+              eventName:
+                type: string
+              points:
+                type: integer
+              position:
+                type: integer
+                nullable: true
+
+    # Registration schema
+    Registration:
+      type: object
+      properties:
+        id:
+          type: integer
+        championshipId:
+          type: integer
+        driverId:
+          type: integer
+        driverName:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, WITHDRAWN]
+        registeredAt:
+          type: string
+          format: date-time
+        withdrawnAt:
+          type: string
+          format: date-time
+          nullable: true
+        withdrawalReason:
+          type: string
+          nullable: true
+
+    # Points Scheme schema
+    PointsScheme:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        pointsMapping:
+          type: object
+          description: Position to points mapping
+          example:
+            '1': 25
+            '2': 18
+            '3': 15
+            '4': 12
+            '5': 10
+        bonusPoints:
+          type: object
+          nullable: true
+          example:
+            fastestLap: 1
+            polePosition: 1
+        dropScores:
+          type: integer
+
+    CreatePointsSchemeRequest:
+      type: object
+      required: [name, pointsMapping]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+        pointsMapping:
+          type: object
+          description: Position to points mapping (1-indexed)
+        bonusPoints:
+          type: object
+          nullable: true
+        dropScores:
+          type: integer
+          minimum: 0
+          default: 0
+
+    # Import schemas
+    ParsedChampionshipData:
+      type: object
+      properties:
+        name:
+          type: string
+        seasonStart:
+          type: string
+          format: date
+        seasonEnd:
+          type: string
+          format: date
+        events:
+          type: array
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              date:
+                type: string
+                format: date
+              track:
+                type: string
+
+    # Common schemas
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        hasMore:
+          type: boolean
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        message:
+          type: string
+        details:
+          type: object
+          nullable: true
+
+  responses:
+    BadRequest:
+      description: Bad request - validation failed
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Bad Request
+            message: Validation failed
+            details:
+              fields:
+                seasonEnd: Season end must be after season start
+
+    Unauthorized:
+      description: Unauthorized - authentication required
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Unauthorized
+            message: Authentication required
+
+    Forbidden:
+      description: Forbidden - insufficient permissions
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Forbidden
+            message: You do not have permission to manage this championship
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not Found
+            message: Championship not found
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal Server Error
+            message: An unexpected error occurred

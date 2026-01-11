@@ -1,0 +1,233 @@
+// This is your Prisma schema file for SNRL Manager
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// User Management (from 001-admin-user)
+// ============================================================================
+
+enum UserRole {
+  admin
+  editor
+  member
+}
+
+enum UserStatus {
+  active
+  inactive
+  deleted
+}
+
+model User {
+  id            Int        @id @default(autoincrement())
+  email         String     @unique @db.VarChar(255)
+  password_hash String     @db.VarChar(255)
+  role          UserRole   @default(member)
+  status        UserStatus @default(active)
+  created_at    DateTime   @default(now())
+  updated_at    DateTime   @updatedAt
+
+  // Relationships from 001-admin-user
+  series_permissions SeriesPermission[] @relation("UserSeriesPermissions")
+  activity_logs      ActivityLog[]      @relation("ActivityLogActor")
+
+  // Relationships from 003-database
+  series_created   ContentSeries[]  @relation("SeriesCreator")
+  content_authored ContentItem[]    @relation("ContentAuthor")
+  versions_created ContentVersion[] @relation("VersionAuthor")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@map("users")
+}
+
+// ============================================================================
+// Series Permissions (from 001-admin-user)
+// ============================================================================
+
+enum PermissionLevel {
+  editor
+}
+
+model SeriesPermission {
+  id           Int             @id @default(autoincrement())
+  user_id      Int
+  series_id    Int
+  permission   PermissionLevel @default(editor)
+  granted_by   Int
+  granted_at   DateTime        @default(now())
+
+  user         User            @relation("UserSeriesPermissions", fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([user_id, series_id])
+  @@index([series_id])
+  @@map("series_permissions")
+}
+
+// ============================================================================
+// Activity Log (from 001-admin-user)
+// ============================================================================
+
+enum ActivityAction {
+  user_created
+  user_updated
+  user_deleted
+  role_changed
+  permission_granted
+  permission_revoked
+  series_created
+  series_updated
+  series_deleted
+  content_created
+  content_updated
+  content_published
+  content_archived
+  version_created
+  version_restored
+}
+
+model ActivityLog {
+  id                 Int            @id @default(autoincrement())
+  timestamp          DateTime       @default(now())
+  admin_id           Int
+  action             ActivityAction
+  target_entity_type String         @db.VarChar(50)
+  target_entity_id   Int
+  changes            Json?
+
+  admin User @relation("ActivityLogActor", fields: [admin_id], references: [id], onDelete: Restrict)
+
+  @@index([admin_id, timestamp])
+  @@index([target_entity_type, target_entity_id])
+  @@index([timestamp(sort: Desc)])
+  @@map("activity_logs")
+}
+
+// ============================================================================
+// Content Series (from 003-database)
+// ============================================================================
+
+enum SeriesStatus {
+  active
+  deleted
+}
+
+model ContentSeries {
+  id          Int          @id @default(autoincrement())
+  title       String       @db.VarChar(200)
+  description String?      @db.Text
+  created_by  Int
+  created_at  DateTime     @default(now())
+  updated_at  DateTime     @updatedAt
+  status      SeriesStatus @default(active)
+
+  // Relationships
+  creator User          @relation("SeriesCreator", fields: [created_by], references: [id], onDelete: Restrict)
+  content ContentItem[] @relation("SeriesContent")
+
+  // Indexes
+  @@index([title])
+  @@index([created_by])
+  @@index([status])
+  @@index([created_at(sort: Desc)])
+  @@map("content_series")
+}
+
+// ============================================================================
+// Content Item (from 003-database)
+// ============================================================================
+
+enum ContentStatus {
+  draft
+  published
+  archived
+}
+
+model ContentItem {
+  id                Int           @id @default(autoincrement())
+  series_id         Int
+  title             String        @db.VarChar(500)
+  body              String        @db.Text
+  author_id         Int
+  status            ContentStatus @default(draft)
+  current_version   Int           @default(1)
+  published_version Int?
+  created_at        DateTime      @default(now())
+  published_at      DateTime?
+  updated_at        DateTime      @updatedAt
+
+  // Full-text search support (PostgreSQL tsvector)
+  search_vector Unsupported("tsvector")?
+
+  // Relationships
+  series   ContentSeries     @relation("SeriesContent", fields: [series_id], references: [id], onDelete: Cascade)
+  author   User              @relation("ContentAuthor", fields: [author_id], references: [id], onDelete: Restrict)
+  versions ContentVersion[]  @relation("ContentVersions")
+  metadata ContentMetadata?  @relation("ContentMetadata")
+
+  // Indexes
+  @@index([series_id])
+  @@index([author_id])
+  @@index([status])
+  @@index([published_at(sort: Desc)])
+  @@index([title])
+  @@index([search_vector], type: Gin)
+  @@map("content_items")
+}
+
+// ============================================================================
+// Content Version (from 003-database)
+// ============================================================================
+
+model ContentVersion {
+  id              Int      @id @default(autoincrement())
+  content_item_id Int
+  version_number  Int
+  title           String   @db.VarChar(500)
+  body            String   @db.Text
+  author_id       Int
+  created_at      DateTime @default(now())
+  is_current      Boolean  @default(false)
+
+  // Relationships
+  content_item ContentItem @relation("ContentVersions", fields: [content_item_id], references: [id], onDelete: Cascade)
+  author       User        @relation("VersionAuthor", fields: [author_id], references: [id], onDelete: Restrict)
+
+  // Indexes
+  @@unique([content_item_id, version_number], name: "unique_content_version")
+  @@index([content_item_id, version_number(sort: Desc)])
+  @@index([created_at(sort: Desc)])
+  @@index([is_current])
+  @@map("content_versions")
+}
+
+// ============================================================================
+// Content Metadata (from 003-database)
+// ============================================================================
+
+model ContentMetadata {
+  id                  Int       @id @default(autoincrement())
+  content_item_id     Int       @unique
+  view_count          Int       @default(0)
+  unique_viewer_count Int       @default(0)
+  last_viewed_at      DateTime?
+  created_at          DateTime  @default(now())
+  updated_at          DateTime  @updatedAt
+
+  // Relationships
+  content_item ContentItem @relation("ContentMetadata", fields: [content_item_id], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([view_count(sort: Desc)])
+  @@index([last_viewed_at(sort: Desc)])
+  @@map("content_metadata")
+}
