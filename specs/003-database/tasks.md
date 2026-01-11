@@ -26,10 +26,10 @@ This feature uses the web application structure established by feature 004-simra
 
 **Purpose**: Project setup for content and series data management
 
-- [ ] T001 [P] Create content-related directories in backend/src/models/ for contentSeries.ts, contentItem.ts, contentVersion.ts, contentMetadata.ts per plan.md
-- [ ] T002 [P] Create content-related directories in backend/src/services/ for series.service.ts, content.service.ts, version.service.ts, metadata.service.ts, search.service.ts per plan.md
-- [ ] T003 [P] Create content-related directories in frontend/src/components/ for series/, content/, versions/, metadata/ per plan.md
-- [ ] T004 [P] Create content-related directories in frontend/src/pages/ for editor/ and member/ per plan.md
+- [X] T001 [P] Create content-related directories in backend/src/models/ for contentSeries.ts, contentItem.ts, contentVersion.ts, contentMetadata.ts per plan.md
+- [X] T002 [P] Create content-related directories in backend/src/services/ for series.service.ts, content.service.ts, version.service.ts, metadata.service.ts, search.service.ts per plan.md
+- [X] T003 [P] Create content-related directories in frontend/src/components/ for series/, content/, versions/, metadata/ per plan.md
+- [X] T004 [P] Create content-related directories in frontend/src/pages/ for editor/ and member/ per plan.md
 
 ---
 
@@ -39,18 +39,18 @@ This feature uses the web application structure established by feature 004-simra
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T005 Define ContentSeries entity in backend/prisma/schema.prisma with id, title, description, created_by FK, status enum (active/deleted), timestamps per data-model.md
-- [ ] T006 Define ContentItem entity in backend/prisma/schema.prisma with id, series_id FK, title, body, author_id FK, status enum (draft/published/archived), current_version, published_version, timestamps, search_vector per data-model.md
-- [ ] T007 Define ContentVersion entity in backend/prisma/schema.prisma with id, content_item_id FK, version_number, title, body, author_id FK, created_at, is_current per data-model.md
-- [ ] T008 Define ContentMetadata entity in backend/prisma/schema.prisma with id, content_item_id FK (unique), view_count, unique_viewer_count, last_viewed_at, timestamps per data-model.md
-- [ ] T009 Create database migration in backend/prisma/migrations/ for all four content entities with indexes per data-model.md
-- [ ] T010 [P] Create PostgreSQL full-text search trigger for ContentItem.search_vector auto-update in migration file per data-model.md and research.md
-- [ ] T011 [P] Create validation utilities in backend/src/utils/validation.ts for content title length, body size limits per plan.md
-- [ ] T012 [P] Extend authorization middleware in backend/src/middleware/authorization.middleware.ts to check series-specific Editor permissions from 001-admin-user per plan.md
-- [ ] T013 [P] Create content model types in backend/src/models/contentSeries.ts based on Prisma schema
-- [ ] T014 [P] Create content model types in backend/src/models/contentItem.ts based on Prisma schema
-- [ ] T015 [P] Create version model types in backend/src/models/contentVersion.ts based on Prisma schema
-- [ ] T016 [P] Create metadata model types in backend/src/models/contentMetadata.ts based on Prisma schema
+- [X] T005 Define ContentSeries entity in backend/prisma/schema.prisma with id, title, description, created_by FK, status enum (active/deleted), timestamps per data-model.md
+- [X] T006 Define ContentItem entity in backend/prisma/schema.prisma with id, series_id FK, title, body, author_id FK, status enum (draft/published/archived), current_version, published_version, timestamps, search_vector per data-model.md
+- [X] T007 Define ContentVersion entity in backend/prisma/schema.prisma with id, content_item_id FK, version_number, title, body, author_id FK, created_at, is_current per data-model.md
+- [X] T008 Define ContentMetadata entity in backend/prisma/schema.prisma with id, content_item_id FK (unique), view_count, unique_viewer_count, last_viewed_at, timestamps per data-model.md
+- [X] T009 Create database migration in backend/prisma/migrations/ for all four content entities with indexes per data-model.md
+- [X] T010 [P] Create PostgreSQL full-text search trigger for ContentItem.search_vector auto-update in migration file per data-model.md and research.md
+- [X] T011 [P] Create validation utilities in backend/src/utils/validation.ts for content title length, body size limits per plan.md
+- [X] T012 [P] Extend authorization middleware in backend/src/middleware/authorization.middleware.ts to check series-specific Editor permissions from 001-admin-user per plan.md
+- [X] T013 [P] Create content model types in backend/src/models/contentSeries.ts based on Prisma schema
+- [X] T014 [P] Create content model types in backend/src/models/contentItem.ts based on Prisma schema
+- [X] T015 [P] Create version model types in backend/src/models/contentVersion.ts based on Prisma schema
+- [X] T016 [P] Create content model types in backend/src/models/contentMetadata.ts based on Prisma schema
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -64,19 +64,19 @@ This feature uses the web application structure established by feature 004-simra
 
 ### Implementation for User Story 1
 
-- [ ] T017 [P] [US1] Create SeriesService in backend/src/services/series.service.ts with createSeries() method: validate title uniqueness, create ContentSeries with created_by per data-model.md
-- [ ] T018 [P] [US1] Add listSeries() method to SeriesService in backend/src/services/series.service.ts: pagination, search by title, filter by status per contracts/openapi.yaml
-- [ ] T019 [P] [US1] Add getSeries() method to SeriesService in backend/src/services/series.service.ts: fetch with content count per contracts/openapi.yaml
-- [ ] T020 [P] [US1] Add updateSeries() method to SeriesService in backend/src/services/series.service.ts: update title/description with Editor/Admin check per contracts/openapi.yaml
-- [ ] T021 [P] [US1] Add deleteSeries() method to SeriesService in backend/src/services/series.service.ts: soft-delete (status='deleted'), check for content items, cascade warning per data-model.md
-- [ ] T022 [US1] Create series routes in backend/src/api/series.routes.ts: GET/POST/PUT/DELETE /api/series, GET /api/series/:id per contracts/openapi.yaml
-- [ ] T023 [US1] Apply authentication and authorization middleware to series endpoints in backend/src/api/series.routes.ts: Editor/Admin required for create/update/delete per plan.md
-- [ ] T024 [US1] Create SeriesList component in frontend/src/components/series/SeriesList.tsx displaying table with title, description, content count, creator, created date
-- [ ] T025 [US1] Create SeriesForm component in frontend/src/components/series/SeriesForm.tsx with title and description fields for create/edit
-- [ ] T026 [US1] Create SeriesCard component in frontend/src/components/series/SeriesCard.tsx for series display with content count badge
-- [ ] T027 [US1] Create SeriesPage component in frontend/src/pages/editor/SeriesPage.tsx integrating SeriesList and SeriesForm per plan.md
-- [ ] T028 [US1] Implement frontend series service in frontend/src/services/series.service.ts with createSeries(), getSeries(), updateSeries(), deleteSeries() methods
-- [ ] T029 [US1] Create useSeries hook in frontend/src/hooks/useSeries.ts for managing series state and fetching per plan.md
+- [X] T017 [P] [US1] Create SeriesService in backend/src/services/series.service.ts with createSeries() method: validate title uniqueness, create ContentSeries with created_by per data-model.md
+- [X] T018 [P] [US1] Add listSeries() method to SeriesService in backend/src/services/series.service.ts: pagination, search by title, filter by status per contracts/openapi.yaml
+- [X] T019 [P] [US1] Add getSeries() method to SeriesService in backend/src/services/series.service.ts: fetch with content count per contracts/openapi.yaml
+- [X] T020 [P] [US1] Add updateSeries() method to SeriesService in backend/src/services/series.service.ts: update title/description with Editor/Admin check per contracts/openapi.yaml
+- [X] T021 [P] [US1] Add deleteSeries() method to SeriesService in backend/src/services/series.service.ts: soft-delete (status='deleted'), check for content items, cascade warning per data-model.md
+- [X] T022 [US1] Create series routes in backend/src/api/series.routes.ts: GET/POST/PUT/DELETE /api/series, GET /api/series/:id per contracts/openapi.yaml
+- [X] T023 [US1] Apply authentication and authorization middleware to series endpoints in backend/src/api/series.routes.ts: Editor/Admin required for create/update/delete per plan.md
+- [X] T024 [US1] Create SeriesList component in frontend/src/components/series/SeriesList.tsx displaying table with title, description, content count, creator, created date
+- [X] T025 [US1] Create SeriesForm component in frontend/src/components/series/SeriesForm.tsx with title and description fields for create/edit
+- [X] T026 [US1] Create SeriesCard component in frontend/src/components/series/SeriesCard.tsx for series display with content count badge
+- [X] T027 [US1] Create SeriesPage component in frontend/src/pages/editor/SeriesPage.tsx integrating SeriesList and SeriesForm per plan.md
+- [X] T028 [US1] Implement frontend series service in frontend/src/services/series.service.ts with createSeries(), getSeries(), updateSeries(), deleteSeries() methods
+- [X] T029 [US1] Create useSeries hook in frontend/src/hooks/useSeries.ts for managing series state and fetching per plan.md
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - Editors can create, view, update, and delete series
 
