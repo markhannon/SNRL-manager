@@ -25,12 +25,12 @@ This feature uses the web application structure established by feature 004-simra
 
 **Purpose**: Project initialization and basic structure for admin user management feature
 
-- [ ] T001 Create backend directory structure with models/, services/, middleware/, api/, utils/ folders per plan.md
-- [ ] T002 Create frontend directory structure with components/admin/, components/auth/, pages/admin/, pages/auth/, services/, hooks/ folders per plan.md
-- [ ] T003 [P] Install backend dependencies in backend/package.json: @fastify/jwt, bcrypt, @fastify/rate-limit per research.md
-- [ ] T004 [P] Install frontend dependencies in frontend/package.json: React 18+, routing library, HTTP client per plan.md
-- [ ] T005 [P] Configure TypeScript for backend in backend/tsconfig.json with strict mode and Prisma paths
-- [ ] T006 [P] Configure TypeScript for frontend in frontend/tsconfig.json with React JSX support
+- [x] T001 Create backend directory structure with models/, services/, middleware/, api/, utils/ folders per plan.md
+- [x] T002 Create frontend directory structure with components/admin/, components/auth/, pages/admin/, pages/auth/, services/, hooks/ folders per plan.md
+- [x] T003 [P] Install backend dependencies in backend/package.json: @fastify/jwt, bcrypt, @fastify/rate-limit per research.md
+- [x] T004 [P] Install frontend dependencies in frontend/package.json: React 18+, routing library, HTTP client per plan.md
+- [x] T005 [P] Configure TypeScript for backend in backend/tsconfig.json with strict mode and Prisma paths
+- [x] T006 [P] Configure TypeScript for frontend in frontend/tsconfig.json with React JSX support
 
 ---
 
@@ -40,16 +40,16 @@ This feature uses the web application structure established by feature 004-simra
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T007 Define Prisma schema in backend/prisma/schema.prisma with User, SeriesPermission, ActivityLog entities from data-model.md
-- [ ] T008 Create initial database migration in backend/prisma/migrations/ for User, SeriesPermission, ActivityLog tables with all indexes
-- [ ] T009 Create database seed script in backend/prisma/seed.ts to create initial admin user with email admin@snrl.example per data-model.md
-- [ ] T010 [P] Implement password hashing utilities in backend/src/utils/password.ts with bcrypt (12 rounds) per research.md
-- [ ] T011 [P] Create shared TypeScript types in backend/src/types/user.ts for UserRole, UserStatus, ActivityAction enums
-- [ ] T012 Create JWT authentication middleware in backend/src/middleware/auth.middleware.ts with httpOnly cookie validation per research.md
-- [ ] T013 Create role-based authorization middleware in backend/src/middleware/authorization.middleware.ts for Admin/Editor/Member checks per research.md
-- [ ] T014 [P] Setup Fastify server configuration in backend/src/server.ts with Pino logging, CORS, cookie support, rate limiting per research.md
-- [ ] T015 [P] Create base error handling middleware in backend/src/middleware/error.middleware.ts with structured error responses
-- [ ] T016 [P] Setup environment configuration in backend/src/config/env.ts for DATABASE_URL, JWT_SECRET, NODE_ENV
+- [x] T007 Define Prisma schema in backend/prisma/schema.prisma with User, SeriesPermission, ActivityLog entities from data-model.md
+- [x] T008 Create initial database migration in backend/prisma/migrations/ for User, SeriesPermission, ActivityLog tables with all indexes
+- [x] T009 Create database seed script in backend/prisma/seed.ts to create initial admin user with email admin@snrl.example per data-model.md
+- [x] T010 [P] Implement password hashing utilities in backend/src/utils/password.ts with bcrypt (12 rounds) per research.md
+- [x] T011 [P] Create shared TypeScript types in backend/src/types/user.ts for UserRole, UserStatus, ActivityAction enums
+- [x] T012 Create JWT authentication middleware in backend/src/middleware/auth.middleware.ts with httpOnly cookie validation per research.md
+- [x] T013 Create role-based authorization middleware in backend/src/middleware/authorization.middleware.ts for Admin/Editor/Member checks per research.md
+- [x] T014 [P] Setup Fastify server configuration in backend/src/server.ts with Pino logging, CORS, cookie support, rate limiting per research.md
+- [x] T015 [P] Create base error handling middleware in backend/src/middleware/error.middleware.ts with structured error responses
+- [x] T016 [P] Setup environment configuration in backend/src/config/env.ts for DATABASE_URL, JWT_SECRET, NODE_ENV
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -63,16 +63,16 @@ This feature uses the web application structure established by feature 004-simra
 
 ### Implementation for User Story 1
 
-- [ ] T017 [P] [US1] Create User model type definitions in backend/src/models/user.ts based on Prisma schema
-- [ ] T018 [US1] Implement AuthService in backend/src/services/auth.service.ts with login() method: validate credentials, verify bcrypt password, generate JWT token
-- [ ] T019 [US1] Implement logout() method in backend/src/services/auth.service.ts with token blacklist support per research.md
-- [ ] T020 [US1] Create auth routes in backend/src/api/auth.routes.ts: POST /api/auth/login, POST /api/auth/logout per contracts/openapi.yaml
-- [ ] T021 [US1] Add rate limiting to login endpoint in backend/src/api/auth.routes.ts (5 attempts per 15 minutes) per research.md
-- [ ] T022 [US1] Implement LoginForm component in frontend/src/components/auth/LoginForm.tsx with email/password fields and validation
-- [ ] T023 [US1] Create LoginPage component in frontend/src/pages/auth/LoginPage.tsx integrating LoginForm per plan.md
-- [ ] T024 [US1] Implement frontend auth service in frontend/src/services/auth.service.ts with login() and logout() API calls
-- [ ] T025 [US1] Create useAuth hook in frontend/src/hooks/useAuth.ts for managing authentication state (logged in user, token status)
-- [ ] T026 [US1] Add authorization check to admin routes to prevent regular users from accessing admin areas per spec.md acceptance scenario 3
+- [x] T017 [P] [US1] Create User model type definitions in backend/src/models/user.ts based on Prisma schema
+- [x] T018 [US1] Implement AuthService in backend/src/services/auth.service.ts with login() method: validate credentials, verify bcrypt password, generate JWT token
+- [x] T019 [US1] Implement logout() method in backend/src/services/auth.service.ts with token blacklist support per research.md
+- [x] T020 [US1] Create auth routes in backend/src/api/auth.routes.ts: POST /api/auth/login, POST /api/auth/logout per contracts/openapi.yaml
+- [x] T021 [US1] Add rate limiting to login endpoint in backend/src/api/auth.routes.ts (5 attempts per 15 minutes) per research.md
+- [x] T022 [US1] Implement LoginForm component in frontend/src/components/auth/LoginForm.tsx with email/password fields and validation
+- [x] T023 [US1] Create LoginPage component in frontend/src/pages/auth/LoginPage.tsx integrating LoginForm per plan.md
+- [x] T024 [US1] Implement frontend auth service in frontend/src/services/auth.service.ts with login() and logout() API calls
+- [x] T025 [US1] Create useAuth hook in frontend/src/hooks/useAuth.ts for managing authentication state (logged in user, token status)
+- [x] T026 [US1] Add authorization check to admin routes to prevent regular users from accessing admin areas per spec.md acceptance scenario 3
 
 **Checkpoint**: At this point, User Story 1 should be fully functional - admins can log in and regular users are blocked from admin areas
 
@@ -86,15 +86,15 @@ This feature uses the web application structure established by feature 004-simra
 
 ### Implementation for User Story 2
 
-- [ ] T027 [US2] Implement UserService in backend/src/services/user.service.ts with listUsers() method: pagination, search, filters per data-model.md query examples
-- [ ] T028 [US2] Create user management routes in backend/src/api/users.routes.ts: GET /api/users with query params (page, limit, role, status, search) per contracts/openapi.yaml
-- [ ] T029 [US2] Apply admin-only authorization middleware to GET /api/users endpoint in backend/src/api/users.routes.ts
-- [ ] T030 [US2] Implement UserList component in frontend/src/components/admin/UserList.tsx displaying table with user info (name, email, role, status, join date)
-- [ ] T031 [US2] Add search input to UserList component in frontend/src/components/admin/UserList.tsx for name/email search
-- [ ] T032 [US2] Add filter dropdowns to UserList component in frontend/src/components/admin/UserList.tsx for role and status filters
-- [ ] T033 [US2] Add pagination controls to UserList component in frontend/src/components/admin/UserList.tsx (25 users per page) per spec.md assumption 4
-- [ ] T034 [US2] Create UsersPage component in frontend/src/pages/admin/UsersPage.tsx integrating UserList per plan.md
-- [ ] T035 [US2] Implement frontend user service in frontend/src/services/user.service.ts with getUsers() method calling GET /api/users
+- [x] T027 [US2] Implement UserService in backend/src/services/user.service.ts with listUsers() method: pagination, search, filters per data-model.md query examples
+- [x] T028 [US2] Create user management routes in backend/src/api/users.routes.ts: GET /api/users with query params (page, limit, role, status, search) per contracts/openapi.yaml
+- [x] T029 [US2] Apply admin-only authorization middleware to GET /api/users endpoint in backend/src/api/users.routes.ts
+- [x] T030 [US2] Implement UserList component in frontend/src/components/admin/UserList.tsx displaying table with user info (name, email, role, status, join date)
+- [x] T031 [US2] Add search input to UserList component in frontend/src/components/admin/UserList.tsx for name/email search
+- [x] T032 [US2] Add filter dropdowns to UserList component in frontend/src/components/admin/UserList.tsx for role and status filters
+- [x] T033 [US2] Add pagination controls to UserList component in frontend/src/components/admin/UserList.tsx (25 users per page) per spec.md assumption 4
+- [x] T034 [US2] Create UsersPage component in frontend/src/pages/admin/UsersPage.tsx integrating UserList per plan.md
+- [x] T035 [US2] Implement frontend user service in frontend/src/services/user.service.ts with getUsers() method calling GET /api/users
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently - admins can log in and view/search/filter users
 
