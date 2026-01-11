@@ -1,7 +1,12 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
+import jwt from '@fastify/jwt';
+import cookie from '@fastify/cookie';
+import rateLimit from '@fastify/rate-limit';
 import logger from './utils/logger';
 import { seriesRoutes } from './api/series.routes';
+import { authRoutes } from './api/auth.routes';
+import { userRoutes } from './api/user.routes';
 import { AppError } from './utils/errors';
 
 /**
@@ -11,6 +16,27 @@ import { AppError } from './utils/errors';
 
 const fastify = Fastify({
   logger,
+});
+
+// Register cookie support
+fastify.register(cookie);
+
+// Register JWT
+fastify.register(jwt, {
+  secret: process.env.JWT_SECRET || 'your-secret-key-change-in-production',
+  sign: {
+    expiresIn: '24h',
+  },
+  cookie: {
+    cookieName: 'token',
+    signed: false,
+  },
+});
+
+// Register rate limiting
+fastify.register(rateLimit, {
+  max: 100,
+  timeWindow: '15 minutes',
 });
 
 // Register CORS
@@ -26,6 +52,8 @@ fastify.get('/health', async () => {
 
 // Register API routes
 fastify.register(async (instance) => {
+  instance.register(authRoutes, { prefix: '/api' });
+  instance.register(userRoutes, { prefix: '/api' });
   instance.register(seriesRoutes, { prefix: '/api' });
   // Add more route modules here as they're implemented
 }, { prefix: '' });

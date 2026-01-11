@@ -1,26 +1,36 @@
 import { FastifyRequest, FastifyReply } from 'fastify';
 import { UnauthorizedError } from '../utils/errors';
+import prisma from '../utils/prisma';
 
 /**
  * Authentication middleware using JWT
- * Extends from 001-admin-user feature
- *
- * NOTE: This is a placeholder implementation
- * Full implementation would include:
- * - JWT token verification using @fastify/jwt
- * - User lookup from token
- * - Session validation
+ * From 001-admin-user feature
  */
+
+export type UserRole = 'admin' | 'editor' | 'member';
 
 export interface AuthenticatedUser {
   id: number;
   email: string;
-  role: 'admin' | 'editor' | 'member';
+  role: UserRole;
+}
+
+export interface JWTPayload {
+  userId: number;
+  email: string;
+  role: UserRole;
 }
 
 declare module 'fastify' {
   interface FastifyRequest {
     user?: AuthenticatedUser;
+  }
+}
+
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: JWTPayload;
+    user: JWTPayload;
   }
 }
 
@@ -32,23 +42,48 @@ export async function authenticateRequest(
   reply: FastifyReply
 ): Promise<void> {
   try {
-    // TODO: Implement actual JWT verification when @fastify/jwt is configured
-    // For now, this is a placeholder that would:
-    // 1. Extract token from Authorization header or cookies
-    // 2. Verify token using fastify.jwt.verify()
-    // 3. Look up user from database
-    // 4. Attach user to request
+    // Try to get token from Authorization header or cookie
+    let token: string | undefined;
 
-    // Placeholder: Check for Authorization header
     const authHeader = request.headers.authorization;
-    if (!authHeader) {
+    if (authHeader?.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (request.cookies?.token) {
+      token = request.cookies.token;
+    }
+
+    if (!token) {
       throw new UnauthorizedError('No authorization token provided');
     }
 
-    // This would be replaced with actual JWT verification
-    // request.user = await verifyAndDecodeJWT(authHeader);
+    // Verify JWT token
+    const decoded = request.server.jwt.verify<JWTPayload>(token);
 
-    throw new UnauthorizedError('Authentication not fully implemented yet - requires JWT setup from 001-admin-user');
+    // Validate user still exists and is active
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    if (!user) {
+      throw new UnauthorizedError('User not found');
+    }
+
+    if (user.status !== 'active') {
+      throw new UnauthorizedError('User account is not active');
+    }
+
+    // Attach user to request
+    request.user = {
+      id: user.id,
+      email: user.email,
+      role: user.role,
+    };
   } catch (error) {
     if (error instanceof UnauthorizedError) {
       throw error;
@@ -74,7 +109,7 @@ export async function requireAuth(
 /**
  * Check if user has required role
  */
-export function hasRole(user: AuthenticatedUser | undefined, ...roles: Array<'admin' | 'editor' | 'member'>): boolean {
+export function hasRole(user: AuthenticatedUser | undefined, ...roles: UserRole[]): boolean {
   if (!user) return false;
   return roles.includes(user.role);
 }
@@ -82,7 +117,7 @@ export function hasRole(user: AuthenticatedUser | undefined, ...roles: Array<'ad
 /**
  * Middleware to require specific role
  */
-export function requireRole(...roles: Array<'admin' | 'editor' | 'member'>) {
+export function requireRole(...roles: UserRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     await requireAuth(request, reply);
 
